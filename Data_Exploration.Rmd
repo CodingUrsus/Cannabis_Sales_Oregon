@@ -1,0 +1,502 @@
+---
+title: "Data_Exploration"
+author: "Austin"
+date: "5/14/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r libraries, include=FALSE}
+library(tidyverse)
+library(GGally)
+```
+
+```{r working_times_and_tasks, include=FALSE}
+# Wednesday, May 14, 13:00-15:20:
+# accessed and read in a newer iteration of the data than I used for the
+# earlier course assignment. Performed a couple of general inspections to make sure
+# that the columns and colnames were preserved, began subsetting the data and
+# exploring. The main ideas driving this set of comparisons were:
+#   1. Illustrating variation in per capita sales for all counties
+#   2. Comparing per capita sales for all county types
+#   3. Beginning to explore if there are unusual sales dynamics on the Idaho border
+# Wednesday May 19, 18:15-20:15:
+# Extended some of the earlier analyses during this time. Including:
+#   1. More fully probing the extent of sales on the Idaho Border and illustrating the
+#   Baker/Malheur tradeoff that coincided with Malheur sales legalization
+#   2. I also looked at some of the pairwise comparisons of different products to
+#   see which might be most correlated.
+# Saturday May 22, 19:35-23:00:
+#   1. Analyzed my hypothesis that a cannabis "bump" in sales coincided with the
+#   early pandemic and was sustained for some time
+# Sunday May 23, 09:10- 13:50:
+#   1. Worked on investigating just Benton County Data
+#   2. polished plots for inclusion in report
+```
+
+```{r read_in_data, include=FALSE}
+## Read in the data
+# The first data has sales information for each county across the years that cannabis
+# has been legal (product_share). note that some counties have had legal restrictions
+# which prevent the sale of cannabis, and have $0 in overall sales. These data
+# are excluded because the focus of my questions are primarily on times/counties where
+# cannabis is currently being sold. There's still over 25,000 rows of information
+product_share <- read.csv("~/ST537/Assignment_3_Exploration/Product_Share_treemap_Full_Data_data.csv") %>%
+  filter(Sales > 0) %>%
+  filter(Month.Year != "5/1/2021")
+
+
+# This data looks at just Benton county data for Edible/Tincture sales. I expect
+# that this is a product type that representes a much smaller overall sales volume
+# relative to raw cannabis flower, concentrates, and other products.
+Benton_county_data <- product_share %>%
+  filter(County=="Benton", Product.Type=="Edible/Tincture", Customer.Type=="Consumer") %>%
+  filter(Sales.Per.Capita>0.1) %>%
+  mutate(Month_Date=as.Date(Month.Year, "%m/%d/%Y"))
+
+
+# There are multiple customer.types in the data, so this is focusing on just the
+# recreational market. I ran through about a dozen or so different patient/consumer
+# comparisons in the data and the consumer data appear to greatly exceed the patient
+# data in most instances
+Consumer_data <- product_share %>%
+  filter(Customer.Type=="Consumer", Sales.Per.Capita > 0.1) %>%
+  mutate(Month_Date=as.Date(Month.Year, "%m/%d/%Y"))
+
+# visualizing the distribution of sales per capita for the different counties
+# zooming in on the tail end of this distribution shows that there are a couple of
+# data points where the sales per capita (for a given month) exceeds $100
+ggplot(product_share, aes(Sales.Per.Capita)) +
+  geom_histogram()
+
+# this stems from the earlier histogram that I made, and it just contains information
+# about counties that have sales per capita ($) that are in excess of 100 per month
+# it contains multiple product types though, which was a bit of a surprise as I had
+# intially assumed that only raw cannabis flower products would 
+# Only baker and malheur counties are represented
+High_Sales <- product_share %>%
+  filter(Sales.Per.Capita > 100) %>%
+  mutate(Month_Date=as.Date(Month.Year, "%m/%d/%Y"))
+
+
+# how well does Population correlate with Sales per capita? Since these two quantities
+# are not independent, this plot is just a first pass at looking to see which population
+# amounts may manifest an outlier in terms of sales per capita. As it turns out there
+# are two counties that have consistently manifested a sales per capita that is much
+# higher than for other counties, the high sales dataframe shows that these sales
+# per capita outliers are just baker and malheur counties
+ggplot(data=Consumer_data, aes(x=Population, y=Sales.Per.Capita)) +
+  geom_point() +
+  facet_grid("Product.Type")
+
+# Edible sales continue to climb. A little background reading that I did suggests
+# the population isn't changing very dramatically, so if the prices are remaining 
+# nearly constant (which is probable with the highly saturated product/vendor market)
+# then edible cannabis sales may be increasing overall. A most dramatic spike
+# occurs in 2020 just before the shutdowns, but every second-third mongth manifests
+# a spike in cannabis sales during this time. Not sure what might be driving this.
+ggplot(data=Benton_county_data, aes(x=Month_Date, y=Sales)) +
+  geom_point()+
+  geom_line() +
+  ylab("Edible Sales")
+
+# Wow, there's a period up until July 2019 where Baker county was selling Usable MJ
+# and concentrates at a sales per capita > $100, but that month is when cannabis
+# sales opened in Malheur (https://www.bizjournals.com/portland/news/2019/07/26/oregon-pot-arrives-on-idahos-doorstep.html)
+# It looks like it took a couple of months for cannabis sales in Malheur to hit the 
+# >$100 per capita threshold, but it appears to have possibly sucked the Baker market
+# dry.
+ggplot(data=High_Sales, aes(x=Month_Date, y=Sales.Per.Capita, color=County)) +
+  geom_point()
+
+# Looking at just baker county data
+Baker_county_data <- product_share %>%
+  filter(County=="Baker", Sales.Per.Capita>0.1) %>%
+  mutate(Month_Date=as.Date(Month.Year, "%m/%d/%Y"))
+
+## Plotting sales per capita for all product types in just Baker county
+# Just double checking that it's the same product types that have been driving
+# sales in other areas
+ggplot(data=Baker_county_data, aes(x=Month_Date, y=Sales.Per.Capita, color=Product.Type)) +
+  geom_point() +
+  facet_grid("Product.Type")
+
+# Same idea, this time with Malheur county
+malheur_county_data <- product_share %>%
+  filter(County=="Malheur", Sales.Per.Capita>0.1) %>%
+  mutate(Month_Date=as.Date(Month.Year, "%m/%d/%Y"))
+
+# Looking to see if the same product type patterns are manifest in this county
+# as this might suggest that competition in the same markets is what drove sales down
+ggplot(data=malheur_county_data, aes(x=Month_Date, y=Sales.Per.Capita, color=Product.Type)) +
+  geom_point() +
+  facet_grid("Product.Type")
+
+## Getting data for baker and malheur counties, comparing total sales between
+## the counties for times where they sold greater than $0 of cannabis products in
+## month. 
+baker_malheur_data <- product_share %>%
+  filter(County %in% c("Malheur", "Baker")) %>%
+  group_by(County, Month.Year) %>%
+  mutate(product_month_total = sum(Sales)) %>%
+  select(Product.Type, County, Month.Year, product_month_total) %>%
+  distinct() %>%
+  mutate(Month_Date=as.Date(Month.Year, "%m/%d/%Y"))
+
+# plotting the total sales for these two adjacent counties. These are of interest
+# because they both share a border with Idaho and thus represent some of the easiest
+# locations for Idaho residents to procure cannabis legally. However, this relationship
+# is partially obscured by the fact that many counties in Eastern Oregon have not
+# yet legalized cannabis. This makes it difficult to estimate to what extent Idaho
+# purchasers may drive the high per capita sales in each county. Still, Boise has
+# the highest population of any closely neighboring cities, and it remains likely that
+# much of the cannabis bought in these counties ends up outside of the county where it
+# is bought.
+baker_malheur_split <- baker_malheur_data %>%
+  filter(Month.Year != "5/1/2021") %>%
+  ggplot(aes(x=Month_Date, y=product_month_total, color = County)) +
+  geom_point() +
+  geom_line()+
+  ylab("Total County Cannabis Sales") +
+  xlab("Date") +
+  theme_classic() +
+  ggtitle("Total Cannabis Sales In Two Oregon Counties\nThat Border Idaho")
+
+# a separte df that uses the original product share df to sum the total sales per
+# capita at each county and for each date. 
+usable_MJ_data <- product_share %>%
+  filter(Month.Year != "5/1/2021") %>%
+#  filter(Year..MonthlySalesbyCountyProductCustomer.csv. == 2020 | Year..MonthlySalesbyCountyProductCustomer.csv. == 2021) %>%
+  select(-c("Sales", "Sales.Detail")) %>%
+  group_by(Date, County) %>%
+  mutate(per_capita_sales = sum(Sales.Per.Capita))
+
+# This just selects a handful of columns from the previous dataset and takes only
+# the unique rows, changing the date variable to a different class
+per_capita_df <- usable_MJ_data %>%
+  select(County, Date, per_capita_sales, Year..MonthlySalesbyCountyProductCustomer.csv.) %>%
+  mutate(Month_Date=as.Date(Date, "%m/%d/%Y")) %>%
+  unique()
+
+# this plots the total per capita sales for all product types across all counties
+# and shows that Baker and Malheur are obvious outlier counties, but I was hoping to get
+# an approximate baseline for what high per capita consumption might look like at other
+# counties in the state as this might help to get a back-of-the-napkin estimate of the
+# dollar amount of cannabis that is being consumed/transported by out of county (mostly
+# Idahoan) purchasers. However, the high rates of sales prohibition in neighboring
+# counties would make even a rough estimate like this difficult to justify because
+# there are likely substantial sales to individuals in neighboring counties as well.
+all_counties_plot <- ggplot(per_capita_df, aes(x=Month_Date, y=per_capita_sales, color=County)) +
+  geom_point() +
+  geom_line() +
+  theme_classic()
+
+# Just a dataset that I wanted to look over where cannabis sales were quite low
+# I ordered this in descending order in the View() just to get an idea for which
+# counties are regularly represented at the bottom in terms of sales. This revealed
+# That for many counties there are extremely small and unexplained additions to overall
+# sales. I spent some time digging around on the state website to get extra
+# info about what these might represent but I couldn't find any useful info.
+Major_Sales <- product_share %>%
+  filter(Product.Type=="Usable MJ", Sales.Per.Capita < 20)
+
+# Looks at max counties for sales
+counties_of_interest <- product_share %>%
+  filter(Product.Type=="Usable MJ") %>%
+  group_by(County) %>%
+  mutate(County.Max = max(Sales)) %>%
+  summarise_each(funs(max(Sales))) %>%
+  select(County, County.Max) %>%
+  arrange(County.Max) %>%
+  top_n(10)
+
+# I spent some time consulting outside county information so that I could select
+# just a few meaningful counties for county/product type comparisons. In this case
+# I selected 11 counties, the top 7 largest counties, Benton County for a sort of
+# personal reference, and Hood River, Linn, and Curry because some of my earlier
+# plots suggested that these were counties that observed a much higher than normal
+# sales per capita. Not entirely sure what factors might be at play there (and I 
+# don't have socio-economic data readily available to merge) but I thought that they
+# might provide an interesting representation of cannabis sales across the state in 
+# the counties that push the largest volume of cannabis (by virtue of their large
+# populations), and counties that appear to vend a disproportionately high
+# amount of cannabis per capita. I excluded Baker and Malheur counties becuase both
+# of them them are likely driven by cannabis sales which are transported out of state,
+# or consumed in local counties that have not legalized cannabis sales yet (i.e. Union)
+selected_counties <- c("Clackamas", "Deschutes", "Jackson", "Marion", "Washington", "Linn", "Curry", "Benton", "Multnomah", "Hood River", "Lane")
+
+
+## This first box plot shows that cannabis sales across different product types in
+# the counties of interest listed above are highly variable, but it appears that 
+# the counties that sell the most of one type of cannabis also sell the most
+# of other types (i.e. Curry county selling raw cannabis and edibles/tinctures)
+all_products_county_boxplot <- product_share %>%
+  group_by(Product.Type, County, Date) %>%
+  mutate(sum_product_sales_per_cap = sum(Sales.Per.Capita)) %>%
+  filter(County %in% selected_counties, !(Product.Type %in% c("Other", "Industrial Hemp", "Industrial Hemp Commodity/Product", "Inhalable Product with Non-Cannabis Additives"))) %>%
+  select(sum_product_sales_per_cap, County, Date, Product.Type) %>%
+  ggplot(aes(x=County, y=sum_product_sales_per_cap)) +
+  geom_boxplot() +
+  ylab("Sales Per Capita Per Month") +
+  facet_wrap("Product.Type") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+# This is a pared down version of the earlier plot that considers only three 
+# cannabis product types for which the scale is actually meaningful. The earlier plot
+# included hemp and other products which don't scale well relative to other types
+# additionally, those are mostly non-psychoactive product types and don't fit
+# in well with questions that I want to investigate.
+county_boxplot <- product_share %>%
+  group_by(Product.Type, County, Date) %>%
+  mutate(sum_product_sales_per_cap = sum(Sales.Per.Capita)) %>%
+  filter(County %in% selected_counties, !(Product.Type %in% c("Other", "Industrial Hemp", "Industrial Hemp Commodity/Product", "Inhalable Product with Non-Cannabis Additives"))) %>%
+  select(sum_product_sales_per_cap, County, Date, Product.Type) %>%
+  ggplot(aes(x=County, y=sum_product_sales_per_cap)) +
+  geom_boxplot() +
+  ylab("Sales Per Capita Per Month") +
+  facet_wrap("Product.Type") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+# does what it says on the box
+# looks at the number of months that a county had a product type that had sales
+# greater than $5 per capita, then arranges from least to most
+counties_that_sell_lots_of_weed_per_capita <- product_share %>%
+  filter(Sales.Per.Capita > 5) %>%
+  count(County) %>%
+  arrange(n)
+
+# looks at the maximum population for different counties
+max_county <- product_share %>%
+  group_by(County) %>%
+  mutate(county_max = max(Population)) %>%
+  select(County, county_max) %>%
+  group_by(County) %>%
+  summarise_each(funs(max))
+
+# merges the information about county population and number of product-months where
+# sales exceeded $5 per capita
+county_and_data <- full_join(max_county, counties_that_sell_lots_of_weed_per_capita) %>%
+  arrange(n)
+
+# plots the information from the above df to see if there may be a strong
+# correlation, as expected, there doesn't really appear to be a correlation there
+ggplot(county_and_data, aes(x=county_max, y=n)) +
+  geom_point()
+
+
+#ggplot(Major_Sales, aes(x=Product.Type, y=Sales.Per.Capita)) +
+#  geom_boxplot()
+
+# I spent a bit of time thinking about this and I don't think that n is really
+# independent of the county max, so probably not particularly meaningful. 
+# I was driving at the question that individual cannabis sale dynamics
+# may vary based on county population size (i.e. could be differences in personal 
+# views on cannabis in urban v. rural areas)
+summary(glm(n~county_max,data=county_and_data))
+
+#
+total_sales <- product_share %>%
+  group_by(County, Product.Type) %>%
+  mutate(total_revenue = sum(Sales)) %>%
+  select(County, total_revenue, Product.Type) %>%
+  filter(County %in% counties_of_interest$County)
+
+
+# I created a plot based on our Antony Unwin reading that would look at cannabis sales
+# across the pandemic year 2020 to initially explore cannabis sales dynamics
+# Note that I initially included Malheur county, but it became very difficult to
+# interpret because the value on the y-axis was so much higher than all other counties
+# so I excluded it in this second iteration of the df.
+cannabis_sales_across_2020_plot <- per_capita_df %>%
+  filter(Year..MonthlySalesbyCountyProductCustomer.csv. == 2020, County !="Malheur") %>%
+  select(County, per_capita_sales, Date) %>%
+  pivot_wider(names_from= Date, values_from = per_capita_sales)
+
+## This plot illustrates Curry county seeing strong cannabis sales across the year
+## and also highlights the decline of sales in Baker county in 2020. A handful of other
+## interesting counties are easy to pick out, but this is just an exploratory plot to
+## look at variation in sales across the counties
+plot1 <- ggparcoord(cannabis_sales_across_2020_plot, groupColumn = "County", columns = 2:13)
+
+
+# The question that drove some of these later investigations was to look at pairwise ratio
+# of different cannabis product sales to determine if the ratios may vary across counties
+edible_vs_mj_sales <- product_share %>%
+  group_by(County, Month.Year, Product.Type) %>%
+  mutate(product_month_total = sum(Sales)) %>%
+  select(Product.Type, County, Month.Year, product_month_total) %>%
+  distinct() %>%
+  mutate(Month_Date=as.Date(Month.Year, "%m/%d/%Y")) %>%
+  ungroup() %>%
+  pivot_wider(names_from = Product.Type, values_from = product_month_total) %>%
+  rename(Edible = 'Edible/Tincture', Concentrate = 'Concentrate/Extract', Raw_Cannabis = 'Usable MJ', Hemp='Industrial Hemp Commodity/Product') %>%
+  mutate(MJ_edible_ratio = log(Raw_Cannabis / Edible), MJ_concentrate_ratio = (Raw_Cannabis / Concentrate), Edible_concentrate_ratio = (Edible / Concentrate), MJ_hemp_ratio = log(Raw_Cannabis / Hemp))
+
+arranged_edible <- edible_vs_mj_sales %>%
+  arrange(MJ_hemp_ratio)
+
+## It generally appears that the ratio of edible to concentrates sales is pretty stable
+Edible_concentrate_ratio_plot <- ggplot(edible_vs_mj_sales, aes(x=Month_Date, y=Edible_concentrate_ratio)) +
+  geom_point() +
+  geom_smooth()
+
+## Compares raw psychoactive cannabis to hemp
+edible_vs_mj_sales %>%
+  ggplot(aes(x=Month_Date, y=MJ_hemp_ratio)) +
+  geom_point() +
+  geom_smooth()
+
+# comparing raw cannabis to edible ratio
+# part of this question was whether a pattern emerges in terms of the seasonality
+# of the different cannabis sales relative to one another, not just for a single
+# product
+ggplot(edible_vs_mj_sales, aes(x=Month_Date, y=MJ_edible_ratio)) +
+  geom_point() + 
+  geom_smooth(method=c("loess"))
+
+# Just going to compare a couple of differnet cannabis product types and look at correlations
+product_sales_only <- edible_vs_mj_sales %>%
+  select(Raw_Cannabis, Edible, Concentrate, Other, Hemp)
+
+# Compares correlation of selected cannabis products
+# strong correlation between edibles and concentrates across all data
+product_sales_pairwise_correlation <- GGally::ggpairs(product_sales_only)
+
+# I want to look at cannabis sales in just some of the largest counties in Oregon
+# to see if there's a possible corona bump in these counties
+# I think that whether a pandemic bump exists in other smaller counties may also exist
+# but because such a large volume of cannabis is sold in these large markets I thought
+# it would be interesting to look at just them
+filtered_edible_date <- edible_vs_mj_sales %>%
+  filter(Month_Date > as.Date("2018-01-01")) %>%
+  filter(County %in% c("Clackamas", "Deschutes", "Jackson", "Marion", "Washington", "Malheur"))
+
+# This is looking at just raw cannbis over time for the counties in question
+# I only incluced counties where cannabis sales were already quite high
+# because the scale isn't very accommodating for counties with much lower sales, 
+# as seen in some of the earlier visualizations
+library(ggfittext)
+rects <- data.frame(xstart = as.Date("2020/03/08","%Y/%m/%d"), 
+xend = as.Date("2020/03/08", "%Y/%m/%d"), plot_label = "Initial Shutdown Period") # from Eric Fail here (https://stackoverflow.com/questions/10542326/provide-shades-between-dates-on-x-axis)
+
+# other plot in my report, I worked on this for a bit
+corona_MJ_bump <- ggplot(filtered_edible_date, aes(x=Month_Date, y=Raw_Cannabis, color=County)) +
+    annotate("rect", fill = "black", alpha = 0.5, 
+        xmin = as.Date("2020/03/08","%Y/%m/%d"), xmax = as.Date("2020/03/09", "%Y/%m/%d"),
+        ymin = -Inf, ymax = Inf,) +
+    annotate("label", x=as.Date("2020-03-08"), 
+           y= 5500000 , label="Oregon State of\nEmergency Declared", fill="black", color="white",fontface="bold",
+           size=3) +
+  geom_line() +
+  ylab("Total Monthly Cannabis Flower Sales") +
+  xlab("Date") +
+  theme_classic() +
+  ggtitle("Total Monthly Cannabis Sales\nIn 7 Oregon Counties (2018-2021)")
+
+
+ggplot(filtered_edible_date, aes(x=Month_Date, y=Concentrate)) +
+  geom_line() +
+  facet_wrap("County") +
+  ylab("Cannabis Edible Sales") +
+  xlab("Date")
+
+
+# Just Benton County data:
+BC_data <- product_share %>%
+  filter(County == "Benton") %>%
+  group_by(Product.Type, Date) %>%
+  mutate(Monthly_Product_Sales = sum(Sales.Per.Capita), formatted_date = as.Date(Date,"%Y/%m/%d")) %>%
+  select(Monthly_Product_Sales, formatted_date, Product.Type, Date, Year..MonthlySalesbyCountyProductCustomer.csv.) %>%
+  filter(!is.na(formatted_date)) #%>%
+  #filter(Year..MonthlySalesbyCountyProductCustomer.csv. %in% c(2018, 2019, 2020, 2021))
+
+## final plot on just benton county
+plot3 <- ggplot(BC_data, aes(fill=Product.Type, y=Monthly_Product_Sales, x=formatted_date)) + 
+    geom_bar(position="fill", stat="identity") +
+  facet_wrap(~ Year..MonthlySalesbyCountyProductCustomer.csv.) +
+  theme_classic() +
+  xlab("Month Number") +
+  ylab("Fraction of Total Monthly Sales") +
+  ggtitle("Fraction of Benton County Cannabis Sales By Product Type") +
+  scale_fill_viridis_d(option="D")
+
+```
+
+```{r plots_of_focus}
+county_boxplot
+
+corona_MJ_bump
+
+product_sales_pairwise_correlation
+
+baker_malheur_split
+
+plot3
+```
+
+
+
+```{r som_shit}
+library(tidyverse)
+library(hflights)
+
+hflights_df <- as_tibble(hflights)
+
+hflights_df <- mutate(hflights_df, 
+  DepHour = floor(DepTime/100),
+  DayOfWeek = factor(DayOfWeek, 
+    labels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")),
+  Date = ISOdate(Year, Month, DayofMonth)
+)
+hou <- filter(hflights_df, Origin == "HOU")
+
+hou_mon <- filter(hou, DayOfWeek == "Mon")
+
+# over all mondays in 2011, avg delay of flights departing by hour
+hou_mon_avg <- hou_mon %>%
+  group_by(DepHour) %>%
+  summarise(avg_delay = mean(DepDelay))
+
+# initial plot
+ggplot(hou_mon_avg, aes(DepHour, avg_delay)) + 
+  geom_point() +
+  geom_line() + 
+  ylab("Average delay (mins)") +
+  xlab("Departure time") +
+  scale_x_continuous(breaks = seq(0, 24, 6),
+    labels = c("midnight", "6am", "noon", "6pm", "midnight")) +
+  theme_bw(18)
+#ggsave("08-monday.png", width = 6, height = 4)
+
+# for each monday in 2011, avg delay of flights departing by hour
+hou_mon_day <- filter(hou, DayOfWeek == "Mon") %>%
+  group_by(Date, DepHour) %>%
+  summarise(avg_delay = mean(DepDelay))
+
+# quantiles for delay by time
+hou_mon_q <- hou_mon %>% group_by(DepHour) %>%
+  summarise(n = n(),
+    q25 = quantile(DepDelay, probs = 0.25, na.rm = TRUE),
+    q50 = quantile(DepDelay, probs = 0.5, na.rm = TRUE),
+    q75 = quantile(DepDelay, probs = 0.75, na.rm = TRUE))
+
+
+## My modification of the initial plot so that it resembles one from the videos
+## get my own dataset that contains all the dots
+hou_mon_data <- hou_mon %>%
+  group_by(DepHour)
+
+# Here's the code for my alternative plot, which recreates the one from the lecture
+alternative_variability_plot <- ggplot(hou_mon_data, aes(DepHour, DepDelay)) + 
+  geom_point(alpha=1/15) + 
+  ylab("Delay (mins)") +
+  xlab("Departure time") +
+  scale_x_continuous(breaks = seq(0, 24, 6),
+    labels = c("midnight", "6am", "noon", "6pm", "midnight")) +
+  theme_bw(18)
+
+
+```
